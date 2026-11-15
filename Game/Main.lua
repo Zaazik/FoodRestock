@@ -10,7 +10,8 @@ local VERIFY_DELAY = 2     -- seconds before bag counts are checked after buying
 local LOAD_RETRY_DELAY = 0.3
 local LOAD_RETRIES = 10    -- vendor item list not loaded after ~3 s = reported as an error
 
-local visit = { open = false, done = false, tries = 0 }
+-- gen changes on every vendor open, so a retry timer left from an earlier visit stops itself.
+local visit = { open = false, done = false, tries = 0, gen = 0, timerPending = false }
 
 -- Merchant item info: C_MerchantFrame.GetItemInfo in Forever, GetMerchantItemInfo elsewhere.
 local function merchantInfo(i)
@@ -31,14 +32,16 @@ local function isListed(id)
 	return Data.WATER[id] or Data.FOOD[id] or Data.COMBO[id] or Data.CONJURED[id]
 end
 
--- Vendor goods; nil while the list is still loading (an item without ID or name).
+-- Vendor goods; nil while the list is still loading (an item without ID, or a listed item
+-- without info or name). Unlisted items only need their ID.
 local function readOffers()
 	local offers = {}
 	for i = 1, GetMerchantNumItems() do
 		local id = merchantItemID(i)
-		local info = merchantInfo(i)
-		if not id or not info or not info.name then return nil end
+		if not id then return nil end
 		if isListed(id) then
+			local info = merchantInfo(i)
+			if not info or not info.name then return nil end
 			offers[#offers + 1] = {
 				index = i, id = id, name = info.name, price = info.price, stackCount = info.stackCount,
 				numAvailable = info.numAvailable, isPurchasable = info.isPurchasable, isUsable = info.isUsable,
@@ -115,19 +118,35 @@ local function buy(b, stackCount)
 	end
 end
 
-local function run()
+-- fromTimer: true on the retry timer path. Only that path counts tries and schedules the next
+-- retry; MERCHANT_UPDATE just attempts a read, so there is one retry chain per visit.
+local run
+local function scheduleRetry()
+	if visit.timerPending then return end
+	visit.timerPending = true
+	local gen = visit.gen
+	C_Timer.After(LOAD_RETRY_DELAY, function()
+		if gen ~= visit.gen then return end
+		visit.timerPending = false
+		run(true)
+	end)
+end
+
+run = function(fromTimer)
 	if not visit.open or visit.done then return end
 	if not FoodRestockDB.enabled then visit.done = true return end
 
 	local offers = readOffers()
 	if not offers then
-		visit.tries = visit.tries + 1
-		if visit.tries >= LOAD_RETRIES then
-			visit.done = true
-			fail("список товаров торговца не загрузился, покупка пропущена")
-			return
+		if fromTimer then
+			visit.tries = visit.tries + 1
+			if visit.tries >= LOAD_RETRIES then
+				visit.done = true
+				fail("список товаров торговца не загрузился, покупка пропущена")
+				return
+			end
 		end
-		C_Timer.After(LOAD_RETRY_DELAY, run)
+		scheduleRetry()
 		return
 	end
 	visit.done = true
@@ -196,13 +215,16 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 			if FoodRestockDB.enabled == nil then FoodRestockDB.enabled = true end
 		end
 	elseif event == "MERCHANT_SHOW" then
-		visit.open, visit.done, visit.tries = true, false, 0
-		-- MERCHANT_SHOW comes before the item list is filled; start on the next frame.
-		C_Timer.After(0, run)
+		visit.gen = visit.gen + 1
+		visit.open, visit.done, visit.tries, visit.timerPending = true, false, 0, false
+		-- MERCHANT_SHOW can come before item data is cached; the first read is on the next frame.
+		local gen = visit.gen
+		C_Timer.After(0, function() if gen == visit.gen then run(false) end end)
 	elseif event == "MERCHANT_UPDATE" then
-		if visit.open and not visit.done then run() end
+		if visit.open and not visit.done then run(false) end
 	elseif event == "MERCHANT_CLOSED" then
 		visit.open = false
+		visit.gen = visit.gen + 1
 	end
 end)
 

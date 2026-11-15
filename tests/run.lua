@@ -21,7 +21,7 @@ function T.eq(actual, expected, msg)
 end
 function T.truthy(v, msg) if not v then error((msg or "truthy") .. ": got " .. tostring(v), 2) end end
 
-local files = { "test_plan" }
+local files = { "test_plan", "test_game" }
 for _, f in ipairs(files) do
 	local cases = require(f)(ns, T)
 	for _, case in ipairs(cases) do
