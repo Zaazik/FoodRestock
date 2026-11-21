@@ -1,6 +1,6 @@
 Required Notice: Copyright (c) 2026 Vasyl Rudenko
 
-Any commercial use of this addon (including selling it, bundling it into paid products, paywalled distribution or paid services built on it) requires the author's prior written permission. To request a commercial license, contact the author.
+Any commercial use of this addon (including selling it, bundling it into paid products, paywalled distribution or paid services built on it) requires the author's prior written permission. To request a commercial license, contact the author on Telegram: @Zaazik.
 
 This repository contains no third-party code (no `Libs/` folder, no embedded libraries). World of Warcraft is a trademark of Blizzard Entertainment, Inc. The game facts listed in `Core/Data.lua` (item IDs, item names, restore values and required levels, looked up on Wowhead and cross-checked against the QuestieDB item list) come from the game and are not covered by this license.
 
