@@ -2,6 +2,7 @@
 ## Title: Food Restock
 ## Notes: Keeps a stack of permanent water and food for your level: buys and sells on vendor open (WoW Forever).
 ## Version: 0.1.0
+## X-License: PolyForm-Noncommercial-1.0.0
 ## SavedVariables: FoodRestockDB
 
 Core\Data.lua
